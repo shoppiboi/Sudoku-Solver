@@ -1,5 +1,8 @@
 #include <vector>
 #include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 #define GRID_SIZE 9
 
@@ -13,27 +16,31 @@ struct Vector2
 
 //	make the grid a global variable
 int grid[GRID_SIZE][GRID_SIZE] = {
-	{0, 0, 0,	2, 6, 0,	7, 0, 1}	,
-	{6, 8, 0,	0, 7, 0,	0, 9, 0}	,
-	{1, 9, 0,	0, 0, 4,	5, 0, 0}	,
+	{0, 0, 0,	0, 0, 0,	0, 0, 0} ,
+	{0, 0, 0,	0, 0, 0,	0, 0, 0} ,
+	{0, 0, 0,	0, 0, 0,	0, 0, 0} ,
 
-	{8, 2, 0,	1, 0, 0,	0, 4, 0}	,
-	{0, 0, 4,	6, 0, 2,	9, 0, 0}	,
-	{0, 5, 0,	0, 0, 3,	0, 2, 8}	,
+	{0, 0, 0,	0, 0, 0,	0, 0, 0} ,
+	{0, 0, 0,	0, 0, 0,	0, 0, 0} ,
+	{0, 0, 0,	0, 0, 0,	0, 0, 0} ,
 
-	{0, 0, 9,	3, 0, 0,	0, 7, 4}	,
-	{0, 4, 0,	0, 5, 0,	0, 3, 6}	,
-	{7, 0, 3,	0, 1, 8,	0, 0, 0}
+	{0, 0, 0,	0, 0, 0,	0, 0, 0} ,
+	{0, 0, 0,	0, 0, 0,	0, 0, 0} ,
+	{0, 0, 0,	0, 0, 0,	0, 0, 0}
 };
-
 
 vector<Vector2> returnEmptyPositions();
 bool checkSquare(Vector2 elementPosition);
 bool checkRow(Vector2 elementPosition);
 bool checkColumn(Vector2 elementPosition);
 void solveSudoku(vector<Vector2> emptyPositions, unsigned int emptyCount);
-void outputGrid();
 
+void generateGrid();
+void generateTopLeft(vector<int> integers);
+void generateTopMiddle(vector<int> integers, int row);
+vector<int> removePreviousThree(vector<int> integers, int row);
+
+void outputGrid();
 
 // displays the Grid and each cell with their respective elements in the console
 void outputGrid()
@@ -72,7 +79,6 @@ void outputGrid()
 	}
 }
 
-
 //	returns a list of all empty cells and their coordinates
 vector<Vector2> returnEmptyPositions()
 {
@@ -92,7 +98,6 @@ vector<Vector2> returnEmptyPositions()
 	return positions;
 }
 
-
 //	for the sake of CheckSquare; 
 //	the coordinate of the top left cell in the respective Square is needed
 Vector2 returnTopLeftSquare(Vector2 emptyPosition)
@@ -109,7 +114,6 @@ Vector2 returnTopLeftSquare(Vector2 emptyPosition)
 
 	return topLeftPosition;
 }
-
 
 //	performs a check to see if a same value exists in the Square the element exists in
 bool checkSquare(Vector2 elementPosition)
@@ -133,7 +137,6 @@ bool checkSquare(Vector2 elementPosition)
 	return true;
 }
 
-
 //	performs a check to see if a same value exists on the same row
 bool checkRow(Vector2 elementPosition)
 {
@@ -147,7 +150,6 @@ bool checkRow(Vector2 elementPosition)
 	}
 	return true;
 }
-
 
 //	performs a check to see if a same value exists on the same column
 bool checkColumn(Vector2 elementPosition)
@@ -163,11 +165,10 @@ bool checkColumn(Vector2 elementPosition)
 	return true;
 }
 
-
 //	performs the solving of the Sudoku by looping through all empty positions and applying the Check-xyz() methods to each cell
 void solveSudoku(vector<Vector2> emptyPositions, unsigned int emptyCount)
 {
-	for (int i = 0; i <= emptyCount - 1; i++)
+	for (int i = 0; i < emptyCount; i++)
 	{
 		if (grid[emptyPositions[i].x][emptyPositions[i].y] == 0
 			|| grid[emptyPositions[i].x][emptyPositions[i].y] <= 9)
@@ -205,22 +206,99 @@ void solveSudoku(vector<Vector2> emptyPositions, unsigned int emptyCount)
 }
 
 
+void generateGrid()
+{
+	vector<int> values {1, 2, 3, 4, 5, 6, 7, 8, 9}; //	array of all possible integers
+
+	generateTopLeft(values); //	creates the top left square of the grid
+
+	vector<int> usedValues{ };
+
+	for (int i = 0; i <= 0; i++)
+	{
+		vector<int> potentials = {  };
+		switch(i)
+		{
+		case 0:
+			potentials = removePreviousThree(values, i);
+			generateTopMiddle(potentials, i);
+		}
+	}
+
+	outputGrid();
+}
+
+void generateTopLeft(vector<int> integers)
+{
+	for(int i = 0; i <= 2; i++)
+	{
+		for (int j = 0; j <= 2; j++)
+		{
+			unsigned int index = 0 + (rand() % integers.size());
+
+			grid[i][j] = integers[index];
+			integers.erase(integers.begin() + index);
+		}
+	}
+}
+
+vector<int> removePreviousThree(vector<int> integers, int row)
+{
+	vector<int> allAllowedIntegers{ };
+
+	int removed{ 0 };
+	int counter{ 0 };
+	while (removed < 3)
+	{
+		for (int j = 0; j <= 2; j++)
+		{
+			if (integers[counter] == grid[row][j])
+			{
+				integers.erase(integers.begin() + (counter));
+				removed += 1;
+				counter = -1;
+				break;
+			}
+		}
+
+		counter += 1;
+	}
+
+	allAllowedIntegers = integers;
+
+	return allAllowedIntegers;
+}
+
+void generateTopMiddle(vector<int> integers, int row)
+{
+	for (int i = 3; i <= 5; i++)
+	{
+		unsigned int index = (0 + (rand() % integers.size()));
+
+		grid[row][i] = integers[index];
+		integers.erase(integers.begin() + index);
+	}
+}
+
 int main()
 {
-	outputGrid();
+	srand(time(0));
+
+	generateGrid();
 
 	//	storing all empty cell positions in a vector-list of Vector2's
-	vector<Vector2> emptyPositions { returnEmptyPositions() };
+	//vector<Vector2> emptyPositions { returnEmptyPositions() };
 
-	unsigned int emptyCount{ emptyPositions.size() };
+	//unsigned int emptyCount{ emptyPositions.size() };
 
-	solveSudoku(emptyPositions, emptyCount);
 
-	cout << "\n";
-	cout << "Number of empty positions: " << emptyCount << "\n";
-	cout << "\n";
+	//solveSudoku(emptyPositions, emptyCount);
 
-	outputGrid();
+	//cout << "\n";
+	//cout << "Number of empty positions: " << emptyCount << "\n";
+	//cout << "\n";
+
+	//outputGrid();
 
 	return 0;
 }
