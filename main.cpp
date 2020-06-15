@@ -37,8 +37,12 @@ void solveSudoku(vector<Vector2> emptyPositions, unsigned int emptyCount);
 
 void generateGrid();
 void generateTopLeft(vector<int> integers);
-void generateTopMiddle(vector<int> integers, int row);
-vector<int> removePreviousThree(vector<int> integers, int row);
+vector<int> generateTopMiddle(vector<int> integers, int row);
+vector<int> generateMiddleLeft(vector<int> integers, int column);
+void generateTopRight(vector<int> integers);
+vector<int> removePreviousRow(vector<int> integers, int row);
+vector<int> removePreviousColumn(vector<int> integers, int column);
+vector<int> removeTopRowValues(vector <int> usedIntegers, vector<int> integers);
 
 void outputGrid();
 
@@ -205,7 +209,7 @@ void solveSudoku(vector<Vector2> emptyPositions, unsigned int emptyCount)
 	}
 }
 
-
+// creates a grid for the user to play Sudoku on
 void generateGrid()
 {
 	vector<int> values {1, 2, 3, 4, 5, 6, 7, 8, 9}; //	array of all possible integers
@@ -214,20 +218,57 @@ void generateGrid()
 
 	vector<int> usedValues{ };
 
-	for (int i = 0; i <= 0; i++)
+	for (int i = 0; i <= 2; i++)
 	{
-		vector<int> potentials = {  };
+		vector<int> potentials{ };
 		switch(i)
 		{
 		case 0:
-			potentials = removePreviousThree(values, i);
-			generateTopMiddle(potentials, i);
+			potentials = removePreviousRow(values, i);
+			usedValues = generateTopMiddle(potentials, i);
+			break;
+		case 1:
+			potentials = removeTopRowValues(usedValues, values);
+			potentials = removePreviousRow(potentials, i);
+			potentials = generateTopMiddle(potentials, i);
+			usedValues.insert(usedValues.end(), potentials.begin(), potentials.end());
+			break;
+		case 2:
+			potentials = removeTopRowValues(usedValues, values);
+			potentials = removePreviousRow(potentials, i);
+
+			if (potentials.size() <= 2) //	if the number of potentials is less then 3, then the Square needs to be re-randomized
+			{
+				i = -1; //reset the for loop
+			}
+			else
+				generateTopMiddle(potentials, i);
+
+			usedValues = { };
+			break;
+		}
+	}
+
+	generateTopRight(values);
+
+
+	for (int i = 0; i <= 0; i++)
+	{
+		vector<int> potentials{ };
+		switch(i)
+		{
+		case 0:
+			potentials = removePreviousColumn(values, i);
+			usedValues = generateMiddleLeft(potentials, i);
+			break;
 		}
 	}
 
 	outputGrid();
 }
 
+//	for the sake of optimization, the top left square of the Sudoku is generated
+//	at random, as no "Sudoku rules" need to be applied yet
 void generateTopLeft(vector<int> integers)
 {
 	for(int i = 0; i <= 2; i++)
@@ -242,13 +283,70 @@ void generateTopLeft(vector<int> integers)
 	}
 }
 
-vector<int> removePreviousThree(vector<int> integers, int row)
+vector<int> generateTopMiddle(vector<int> integers, int row)
+{
+	vector<int> chosenValues{ };
+
+	for (int i = 3; i <= 5; i++)
+	{
+		unsigned int index = (0 + (rand() % integers.size()));
+
+		grid[row][i] = integers[index];
+		chosenValues.push_back(integers[index]);
+		integers.erase(integers.begin() + index);
+	}
+
+	return chosenValues;
+}
+
+void generateTopRight(vector<int> integers)
+{
+	for (int i = 0; i <= 2; i++)
+	{
+		vector<int> values = integers;
+		for (int j = 0; j <= 5; j++)
+		{
+			if (count(values.begin(), values.end(), grid[i][j]))
+			{
+				values.erase(remove(values.begin(), values.end(), grid[i][j]), values.end());
+			}
+		}
+
+		for (int k = 6; k <= 8; k++)
+		{
+			unsigned int index = (0 + (rand() % values.size()));
+
+			grid[i][k] = values[index];
+			values.erase(values.begin() + index);
+		}
+	}
+}
+
+
+vector<int> generateMiddleLeft(vector<int> integers, int column)
+{
+	vector<int> chosenValues{ };
+
+	for (int i = 3; i <= 5; i++)
+	{
+		unsigned int index = (0 + rand() % integers.size());
+
+		grid[i][column] = integers[index];
+		chosenValues.push_back(integers[index]);
+		integers.erase(integers.begin() + index);
+	}
+
+	return chosenValues;
+}
+
+//	removes the elements from the list of potentials found on row already
+vector<int> removePreviousRow(vector<int> integers, int row)
 {
 	vector<int> allAllowedIntegers{ };
 
 	int removed{ 0 };
 	int counter{ 0 };
-	while (removed < 3)
+	while (removed < 3 && counter < integers.size())
 	{
 		for (int j = 0; j <= 2; j++)
 		{
@@ -269,15 +367,51 @@ vector<int> removePreviousThree(vector<int> integers, int row)
 	return allAllowedIntegers;
 }
 
-void generateTopMiddle(vector<int> integers, int row)
+vector<int> removePreviousColumn(vector<int> integers, int column)
 {
-	for (int i = 3; i <= 5; i++)
-	{
-		unsigned int index = (0 + (rand() % integers.size()));
+	vector<int> allAllowedIntegers{ };
 
-		grid[row][i] = integers[index];
-		integers.erase(integers.begin() + index);
+	int removed{ 0 };
+	int counter{ 0 };
+	while (removed < 3 && counter < integers.size())
+	{
+		for (int j = 0; j <= 2; j++)
+		{
+			if (integers[counter] == grid[j][column])
+			{
+				integers.erase(integers.begin() + counter);
+				removed += 1;
+				counter -= 1;
+				break;
+			}
+		}
+
+		counter += 1;
 	}
+
+	allAllowedIntegers = integers;
+
+	return allAllowedIntegers;
+}
+
+vector<int> removeTopRowValues(vector <int> usedIntegers, vector<int> integers)
+{
+	vector<int> allowedValues{ integers };
+
+	int removed{ 0 };
+	for (int i = 0; i <= usedIntegers.size() - 1; i++)
+	{
+		for (int j = 0; j <= allowedValues.size() - 1; j++)
+		{
+			if (usedIntegers[i] == allowedValues[j])
+			{
+				allowedValues.erase(allowedValues.begin() + j);
+				removed -= 1;
+			}
+		}
+	}
+
+	return allowedValues;
 }
 
 int main()
