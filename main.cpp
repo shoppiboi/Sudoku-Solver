@@ -40,6 +40,7 @@ void generateTopLeft(vector<int> integers);
 vector<int> generateTopMiddle(vector<int> integers, int row);
 vector<int> generateMiddleLeft(vector<int> integers, int column);
 void generateTopRight(vector<int> integers);
+void generateMiddle(vector<int> integers);
 vector<int> removePreviousRow(vector<int> integers, int row);
 vector<int> removePreviousColumn(vector<int> integers, int column);
 vector<int> removeTopRowValues(vector <int> usedIntegers, vector<int> integers);
@@ -209,210 +210,243 @@ void solveSudoku(vector<Vector2> emptyPositions, unsigned int emptyCount)
 	}
 }
 
-// creates a grid for the user to play Sudoku on
+int addIntegerToGrid(vector<int> integers, Vector2 position)
+{
+	unsigned int number = 0 + (rand() % integers.size());
+
+	grid[position.x][position.y] = integers[number];
+
+	return integers[number];
+}
+
+
+/*
+	Refer to this layout guide for the Grid when tracing through generateGrid():
+
+		top-Left	top-Mid		top-Right
+
+		mid-Left	mid-Mid		mid-Right
+
+		bot-Left	bot-Mid		bot-Right
+
+	The squares from mid-Left onwards will not be specifically generated, but will
+	be filled in iteratively by using the following as a reference(SQ = Square):
+	
+	- top-Left (SQ)
+	- top-Mid (SQ)
+	- top-Right (SQ)
+	- first column of mid-Left
+	- first column of bot-Left
+
+	This will be done by using the solveSudoku() function.
+
+	Credits for grid-filling optimizations:
+	https://dlbeer.co.nz/articles/sudoku.html
+*/
+
+/*	For the sake of optimization, the top left square of the Sudoku is generated
+	at random, as no "Sudoku rules" need to be applied yet							*/
+void generateTopLeft(vector<int> integers)
+{
+	for (int i = 0; i <= 2; i++)
+	{
+		for (int j = 0; j <= 2; j++)
+		{
+			//	takes random index between the current available ints (betweeen 0-9)
+			unsigned int index = 0 + (rand() % integers.size()); 
+
+			grid[i][j] = integers[index];
+			integers.erase(integers.begin() + index); //	removes chosen int
+		}
+	}
+}
+
+//	filters out values already present in the same row
+vector<int> filterLeft(vector<int> integers, int times, int row)
+{
+	int counter{ 0 };
+
+	vector<int> values = integers;
+	while (counter <= times)
+	{
+		for (int j = counter * 3; j <= counter * 3 + 2; j++)
+		{
+			if (count(values.begin(), values.end(), grid[row][j]))
+			{
+				values.erase(remove(values.begin(), values.end(), grid[row][j]), values.end());
+			}
+		}
+
+		counter += 1;
+	}
+
+	return values;
+}
+
+//	filters out values already present in the same column
+vector<int> filterTop(vector<int> integers, int times, int column)
+{
+	int counter{ 0 };
+
+	vector<int> values = integers;
+	while (counter <= times)
+	{
+		for (int j = counter * 3; j <= counter * 3 + 2; j++)
+		{
+			if (count(values.begin(), values.end(), grid[j][column]))
+			{
+				values.erase(remove(values.begin(), values.end(), grid[j][column]), values.end());
+			}
+		}
+
+		counter += 1;
+	}
+
+	return values;
+}
+
+//	filters out values already present in the square
+vector<int> filterUsedValues(vector<int> usedValues, vector<int> values)
+{
+	for (int i = 0; i <= usedValues.size() - 1; i++)
+	{
+		if (count(values.begin(), values.end(), usedValues[i]))
+			values.erase(remove(values.begin(), values.end(), usedValues[i]), values.end());
+	}
+
+	return values;
+}
+
+
+
+/*	returns a vector containing the coordinates of the remaining empty cells
+	(used by generateGrid)														*/
+vector<Vector2> generateDefaultEmpties()
+{
+	vector<Vector2> positions{ };
+	for (int i = 3; i <= 8; i++)
+	{
+		for (int j = 1; j <= 8; j++)
+		{
+			positions.push_back(Vector2{ i, j });
+		}
+	}
+
+	return positions;
+}
+
+//	creates a grid to act as a base for a Sudoku puzzle
 void generateGrid()
 {
-	vector<int> values {1, 2, 3, 4, 5, 6, 7, 8, 9}; //	array of all possible integers
+	vector<int> values{ 1, 2, 3, 4, 5, 6, 7, 8, 9 }; //	array of all possible integers
 
-	generateTopLeft(values); //	creates the top left square of the grid
+	generateTopLeft(values); //	generates top-Left
 
 	vector<int> usedValues{ };
 
+	//	generates top-Mid
+	for (int i = 0; i <= 2; i++)
+	{
+		vector<int> potentials{ }; //	stores all the potential values for a cell
+		int chosenValue{ };
+
+		for (int j = 3; j <= 5; j++)
+		{
+
+			potentials = filterLeft(values, 0, i);
+
+			if (usedValues.size() > 0)
+				potentials = filterUsedValues(usedValues, potentials);
+
+			if (potentials.size() == 0)
+			{
+				i = -1;
+				usedValues = { };
+			}
+			else
+			{
+				//	chooses int from potentials and places it in its respective cell
+				chosenValue = addIntegerToGrid(potentials, Vector2{ i, j }); 
+
+				//	removes the chosenValue from the list of potentials
+				potentials.erase(remove(potentials.begin(), potentials.end(), chosenValue), potentials.end());
+				usedValues.push_back(chosenValue);
+			}
+		}
+	}
+
+	usedValues = { };
+
+	//generates top-Right
 	for (int i = 0; i <= 2; i++)
 	{
 		vector<int> potentials{ };
-		switch(i)
-		{
-		case 0:
-			potentials = removePreviousRow(values, i);
-			usedValues = generateTopMiddle(potentials, i);
-			break;
-		case 1:
-			potentials = removeTopRowValues(usedValues, values);
-			potentials = removePreviousRow(potentials, i);
-			potentials = generateTopMiddle(potentials, i);
-			usedValues.insert(usedValues.end(), potentials.begin(), potentials.end());
-			break;
-		case 2:
-			potentials = removeTopRowValues(usedValues, values);
-			potentials = removePreviousRow(potentials, i);
+		int chosenValue{ };
 
-			if (potentials.size() <= 2) //	if the number of potentials is less then 3, then the Square needs to be re-randomized
+		for (int j = 6; j <= 8; j++)
+		{
+			potentials = filterLeft(values, 1, i);
+
+			if (usedValues.size() > 0)
+				potentials = filterUsedValues(usedValues, potentials);
+
+			if (potentials.size() == 0)
 			{
-				i = -1; //reset the for loop
+				i = -1;
+				usedValues = { };
 			}
 			else
-				generateTopMiddle(potentials, i);
+			{
+				chosenValue = addIntegerToGrid(potentials, Vector2{ i, j });
 
-			usedValues = { };
-			break;
+				potentials.erase(remove(potentials.begin(), potentials.end(), chosenValue), potentials.end());
+				usedValues.push_back(chosenValue);
+			}
 		}
 	}
 
-	generateTopRight(values);
+	usedValues = { };
 
-
-	for (int i = 0; i <= 0; i++)
+	//	generates the entire first column
+	for (int i = 3; i <= 8; i++)
 	{
 		vector<int> potentials{ };
-		switch(i)
+		int chosenValue{ };
+
+		potentials = filterTop(values, 0, 0);
+
+		if (usedValues.size() > 0)
+			potentials = filterUsedValues(usedValues, potentials);
+
+		if (potentials.size() == 0)
 		{
-		case 0:
-			potentials = removePreviousColumn(values, i);
-			usedValues = generateMiddleLeft(potentials, i);
-			break;
+			i = 2;
+			usedValues = { };
+		}
+		else 
+		{
+			chosenValue = addIntegerToGrid(potentials, Vector2{ i, 0 });
+
+			potentials.erase(remove(potentials.begin(), potentials.end(), chosenValue), potentials.end());
+			usedValues.push_back(chosenValue);
 		}
 	}
+
+	/*	
+		After filling all of the "top" Squares, the first column can be fully
+		filled with the remaining 6 values. Rest of the empty cells need to be
+		iteratively filled in, and this has been done by utilising the
+		solveSudoku(), which was originally made to solve a given Sudoku. Which, 
+		it technically is doing when generating a grid.
+	*/ 
+
+	solveSudoku(generateDefaultEmpties(), 48);
 
 	outputGrid();
 }
 
-//	for the sake of optimization, the top left square of the Sudoku is generated
-//	at random, as no "Sudoku rules" need to be applied yet
-void generateTopLeft(vector<int> integers)
-{
-	for(int i = 0; i <= 2; i++)
-	{
-		for (int j = 0; j <= 2; j++)
-		{
-			unsigned int index = 0 + (rand() % integers.size());
-
-			grid[i][j] = integers[index];
-			integers.erase(integers.begin() + index);
-		}
-	}
-}
-
-vector<int> generateTopMiddle(vector<int> integers, int row)
-{
-	vector<int> chosenValues{ };
-
-	for (int i = 3; i <= 5; i++)
-	{
-		unsigned int index = (0 + (rand() % integers.size()));
-
-		grid[row][i] = integers[index];
-		chosenValues.push_back(integers[index]);
-		integers.erase(integers.begin() + index);
-	}
-
-	return chosenValues;
-}
-
-void generateTopRight(vector<int> integers)
-{
-	for (int i = 0; i <= 2; i++)
-	{
-		vector<int> values = integers;
-		for (int j = 0; j <= 5; j++)
-		{
-			if (count(values.begin(), values.end(), grid[i][j]))
-			{
-				values.erase(remove(values.begin(), values.end(), grid[i][j]), values.end());
-			}
-		}
-
-		for (int k = 6; k <= 8; k++)
-		{
-			unsigned int index = (0 + (rand() % values.size()));
-
-			grid[i][k] = values[index];
-			values.erase(values.begin() + index);
-		}
-	}
-}
 
 
-vector<int> generateMiddleLeft(vector<int> integers, int column)
-{
-	vector<int> chosenValues{ };
-
-	for (int i = 3; i <= 5; i++)
-	{
-		unsigned int index = (0 + rand() % integers.size());
-
-		grid[i][column] = integers[index];
-		chosenValues.push_back(integers[index]);
-		integers.erase(integers.begin() + index);
-	}
-
-	return chosenValues;
-}
-
-//	removes the elements from the list of potentials found on row already
-vector<int> removePreviousRow(vector<int> integers, int row)
-{
-	vector<int> allAllowedIntegers{ };
-
-	int removed{ 0 };
-	int counter{ 0 };
-	while (removed < 3 && counter < integers.size())
-	{
-		for (int j = 0; j <= 2; j++)
-		{
-			if (integers[counter] == grid[row][j])
-			{
-				integers.erase(integers.begin() + (counter));
-				removed += 1;
-				counter = -1;
-				break;
-			}
-		}
-
-		counter += 1;
-	}
-
-	allAllowedIntegers = integers;
-
-	return allAllowedIntegers;
-}
-
-vector<int> removePreviousColumn(vector<int> integers, int column)
-{
-	vector<int> allAllowedIntegers{ };
-
-	int removed{ 0 };
-	int counter{ 0 };
-	while (removed < 3 && counter < integers.size())
-	{
-		for (int j = 0; j <= 2; j++)
-		{
-			if (integers[counter] == grid[j][column])
-			{
-				integers.erase(integers.begin() + counter);
-				removed += 1;
-				counter -= 1;
-				break;
-			}
-		}
-
-		counter += 1;
-	}
-
-	allAllowedIntegers = integers;
-
-	return allAllowedIntegers;
-}
-
-vector<int> removeTopRowValues(vector <int> usedIntegers, vector<int> integers)
-{
-	vector<int> allowedValues{ integers };
-
-	int removed{ 0 };
-	for (int i = 0; i <= usedIntegers.size() - 1; i++)
-	{
-		for (int j = 0; j <= allowedValues.size() - 1; j++)
-		{
-			if (usedIntegers[i] == allowedValues[j])
-			{
-				allowedValues.erase(allowedValues.begin() + j);
-				removed -= 1;
-			}
-		}
-	}
-
-	return allowedValues;
-}
 
 int main()
 {
