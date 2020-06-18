@@ -1,3 +1,28 @@
+/*
+	Refer to this layout guide for the Grid when tracing through generateGrid().
+
+	Grid layout:
+		top-Left	top-Mid		top-Right
+
+		mid-Left	mid-Mid		mid-Right
+
+		bot-Left	bot-Mid		bot-Right
+
+	The squares from mid-Left onwards will not be specifically generated, but will
+	be filled in iteratively by using the following as a reference(SQ = Square):
+
+	- top-Left (SQ)
+	- top-Mid (SQ)
+	- top-Right (SQ)
+	- first column of mid-Left
+	- first column of bot-Left
+
+	This will be done by using the solveSudoku() function.
+
+	Credits for grid-filling optimizations:
+	https://dlbeer.co.nz/articles/sudoku.html
+*/
+
 #include <vector>
 #include <iostream>
 #include <stdio.h>
@@ -29,27 +54,38 @@ int grid[GRID_SIZE][GRID_SIZE] = {
 	{0, 0, 0,	0, 0, 0,	0, 0, 0}
 };
 
+vector<int> values{ 1, 2, 3, 4, 5, 6, 7, 8, 9 }; //	array of all possible integers
+
+// functions related to the solver
+void solveSudoku(vector<Vector2> emptyPositions, unsigned int emptyCount);
 vector<Vector2> returnEmptyPositions();
 bool checkSquare(Vector2 elementPosition);
 bool checkRow(Vector2 elementPosition);
 bool checkColumn(Vector2 elementPosition);
-void solveSudoku(vector<Vector2> emptyPositions, unsigned int emptyCount);
 
+// functions related to the grid generator
 void generateGrid();
+int addIntegerToGrid(vector<int> integers, Vector2 position);
 void generateTopLeft(vector<int> integers);
-vector<int> generateTopMiddle(vector<int> integers, int row);
-vector<int> generateMiddleLeft(vector<int> integers, int column);
-void generateTopRight(vector<int> integers);
-void generateMiddle(vector<int> integers);
-vector<int> removePreviousRow(vector<int> integers, int row);
-vector<int> removePreviousColumn(vector<int> integers, int column);
-vector<int> removeTopRowValues(vector <int> usedIntegers, vector<int> integers);
+vector<int> filterRow(vector<int> integers, int times, int row, int exception);
+vector<int> filterColumn(vector<int> integers, int times, int column, int exception);
+vector<int> filterUsedValues(vector<int> usedValues, vector<int> values);
+vector<Vector2> generateDefaultEmpties();
+
+// functions related to puzzle generator
+vector<Vector2> generatePuzzle();
+vector<Vector2> getAllPositions();
+vector<Vector2> shufflePositions(vector<Vector2> allCellPositions);
+bool confirmPosition(Vector2 pos, vector<Vector2> emptyPositions);
+vector<int> filterSquare(vector<int> integers, Vector2 pos);
 
 void outputGrid();
 
 // displays the Grid and each cell with their respective elements in the console
 void outputGrid()
 {
+	cout << "\n";
+
 	int offset{ 0 };
 	bool offsetting;
 
@@ -170,7 +206,8 @@ bool checkColumn(Vector2 elementPosition)
 	return true;
 }
 
-//	performs the solving of the Sudoku by looping through all empty positions and applying the Check-xyz() methods to each cell
+/*	performs the solving of the Sudoku by looping through all empty positions
+and applying the Check-xyz() methods to each cell									*/
 void solveSudoku(vector<Vector2> emptyPositions, unsigned int emptyCount)
 {
 	for (int i = 0; i < emptyCount; i++)
@@ -182,6 +219,7 @@ void solveSudoku(vector<Vector2> emptyPositions, unsigned int emptyCount)
 
 			bool failed{ false };
 
+			// if the maximum limit has been reached, go back to previous cell
 			if (grid[emptyPositions[i].x][emptyPositions[i].y] == 10)
 			{
 				grid[emptyPositions[i].x][emptyPositions[i].y] = 0;
@@ -219,31 +257,6 @@ int addIntegerToGrid(vector<int> integers, Vector2 position)
 	return integers[number];
 }
 
-
-/*
-	Refer to this layout guide for the Grid when tracing through generateGrid():
-
-		top-Left	top-Mid		top-Right
-
-		mid-Left	mid-Mid		mid-Right
-
-		bot-Left	bot-Mid		bot-Right
-
-	The squares from mid-Left onwards will not be specifically generated, but will
-	be filled in iteratively by using the following as a reference(SQ = Square):
-	
-	- top-Left (SQ)
-	- top-Mid (SQ)
-	- top-Right (SQ)
-	- first column of mid-Left
-	- first column of bot-Left
-
-	This will be done by using the solveSudoku() function.
-
-	Credits for grid-filling optimizations:
-	https://dlbeer.co.nz/articles/sudoku.html
-*/
-
 /*	For the sake of optimization, the top left square of the Sudoku is generated
 	at random, as no "Sudoku rules" need to be applied yet							*/
 void generateTopLeft(vector<int> integers)
@@ -261,51 +274,49 @@ void generateTopLeft(vector<int> integers)
 	}
 }
 
-//	filters out values already present in the same row
-vector<int> filterLeft(vector<int> integers, int times, int row)
+//	filters out values present in the same row
+vector<int> filterRow(vector<int> integers, int times, int row, int exception)
 {
 	int counter{ 0 };
 
-	vector<int> values = integers;
 	while (counter <= times)
 	{
 		for (int j = counter * 3; j <= counter * 3 + 2; j++)
 		{
-			if (count(values.begin(), values.end(), grid[row][j]))
+			if (count(integers.begin(), integers.end(), grid[row][j]) && j != exception)
 			{
-				values.erase(remove(values.begin(), values.end(), grid[row][j]), values.end());
+				integers.erase(remove(integers.begin(), integers.end(), grid[row][j]), integers.end());
 			}
 		}
 
 		counter += 1;
 	}
 
-	return values;
+	return integers;
 }
 
-//	filters out values already present in the same column
-vector<int> filterTop(vector<int> integers, int times, int column)
+//	filters out values present in the same column
+vector<int> filterColumn(vector<int> integers, int times, int column, int exception)
 {
 	int counter{ 0 };
 
-	vector<int> values = integers;
 	while (counter <= times)
 	{
 		for (int j = counter * 3; j <= counter * 3 + 2; j++)
 		{
-			if (count(values.begin(), values.end(), grid[j][column]))
+			if (count(integers.begin(), integers.end(), grid[j][column]) && j != exception)
 			{
-				values.erase(remove(values.begin(), values.end(), grid[j][column]), values.end());
+				integers.erase(remove(integers.begin(), integers.end(), grid[j][column]), integers.end());
 			}
 		}
 
 		counter += 1;
 	}
 
-	return values;
+	return integers;
 }
 
-//	filters out values already present in the square
+//	filters out already used values in a square (during grid generation)
 vector<int> filterUsedValues(vector<int> usedValues, vector<int> values)
 {
 	for (int i = 0; i <= usedValues.size() - 1; i++)
@@ -317,10 +328,8 @@ vector<int> filterUsedValues(vector<int> usedValues, vector<int> values)
 	return values;
 }
 
-
-
 /*	returns a vector containing the coordinates of the remaining empty cells
-	(used by generateGrid)														*/
+	(used by generateGrid)															*/
 vector<Vector2> generateDefaultEmpties()
 {
 	vector<Vector2> positions{ };
@@ -338,22 +347,20 @@ vector<Vector2> generateDefaultEmpties()
 //	creates a grid to act as a base for a Sudoku puzzle
 void generateGrid()
 {
-	vector<int> values{ 1, 2, 3, 4, 5, 6, 7, 8, 9 }; //	array of all possible integers
-
 	generateTopLeft(values); //	generates top-Left
 
 	vector<int> usedValues{ };
 
-	//	generates top-Mid
+	// generates top-Mid
 	for (int i = 0; i <= 2; i++)
 	{
-		vector<int> potentials{ }; //	stores all the potential values for a cell
+		vector<int> potentials{ }; // stores all the potential values for a cell
 		int chosenValue{ };
 
 		for (int j = 3; j <= 5; j++)
 		{
 
-			potentials = filterLeft(values, 0, i);
+			potentials = filterRow(values, 0, i, j);
 
 			if (usedValues.size() > 0)
 				potentials = filterUsedValues(usedValues, potentials);
@@ -365,10 +372,10 @@ void generateGrid()
 			}
 			else
 			{
-				//	chooses int from potentials and places it in its respective cell
+				// chooses int from potentials and places it in its respective cell
 				chosenValue = addIntegerToGrid(potentials, Vector2{ i, j }); 
 
-				//	removes the chosenValue from the list of potentials
+				// removes the chosenValue from the list of potentials
 				potentials.erase(remove(potentials.begin(), potentials.end(), chosenValue), potentials.end());
 				usedValues.push_back(chosenValue);
 			}
@@ -377,7 +384,7 @@ void generateGrid()
 
 	usedValues = { };
 
-	//generates top-Right
+	// generates top-Right
 	for (int i = 0; i <= 2; i++)
 	{
 		vector<int> potentials{ };
@@ -385,7 +392,7 @@ void generateGrid()
 
 		for (int j = 6; j <= 8; j++)
 		{
-			potentials = filterLeft(values, 1, i);
+			potentials = filterRow(values, 1, i, j);
 
 			if (usedValues.size() > 0)
 				potentials = filterUsedValues(usedValues, potentials);
@@ -407,13 +414,13 @@ void generateGrid()
 
 	usedValues = { };
 
-	//	generates the entire first column
+	// generates the entire first column
 	for (int i = 3; i <= 8; i++)
 	{
 		vector<int> potentials{ };
 		int chosenValue{ };
 
-		potentials = filterTop(values, 0, 0);
+		potentials = filterColumn(values, 0, 0, i);
 
 		if (usedValues.size() > 0)
 			potentials = filterUsedValues(usedValues, potentials);
@@ -435,36 +442,136 @@ void generateGrid()
 	/*	
 		After filling all of the "top" Squares, the first column can be fully
 		filled with the remaining 6 values. Rest of the empty cells need to be
-		iteratively filled in, and this has been done by utilising the
-		solveSudoku(), which was originally made to solve a given Sudoku. Which, 
-		it technically is doing when generating a grid.
+		iteratively filled in, and this has been done by utilising solveSudoku(),
+		which was originally made to solve a given Sudoku. Which, it technically
+		is doing when generating a grid.
 	*/ 
 
 	solveSudoku(generateDefaultEmpties(), 48);
+}
 
-	outputGrid();
+//	returns all positions in a grid from {0, 0} to {8, 8}
+vector<Vector2> getAllPositions()
+{
+	vector<Vector2> positions{ };
+
+	for (int i = 0; i <= 8; i++)
+	{
+		for (int j = 0; j <= 8; j++)
+		{
+			positions.push_back(Vector2{ i, j });
+		}
+	}
+
+	return positions;
+}
+
+//	shuffles around all the positions obtained from getAllPositions()
+vector<Vector2> shufflePositions(vector<Vector2> allCellPositions)
+{
+	int size = allCellPositions.size();
+
+	for (int i = 0; i < (size - 1); i++)
+	{
+		int index = i + rand() % (size - i);
+		if (index > (size - 1)) index = size - 1;
+		swap(allCellPositions[i], allCellPositions[index]);
+	}
+
+	return allCellPositions;
+}
+
+//	filters out values present in the square (during puzzle generation)
+vector<int> filterSquare(vector<int> integers, Vector2 pos)
+{
+	Vector2 topLeftPosition{ returnTopLeftSquare(pos) };
+
+	for (int i = topLeftPosition.x; i <= topLeftPosition.x + 2; i++)
+	{
+		for (int j = topLeftPosition.y; j <= topLeftPosition.y + 2; j++)
+		{
+			if (count(integers.begin(), integers.end(), grid[i][j]))
+			{
+				integers.erase(remove(integers.begin(), integers.end(), grid[i][j]), integers.end());
+			}
+		}
+	}
+
+	return integers;
 }
 
 
+/*
+	Checks if a given cell-position has a unique value by applying all the
+	filterXYZ() functions to that position. If the final size of Solutions is
+	1, then the position has a unique solution, hence can be used for the
+	puzzle.
+*/
+bool confirmPosition(Vector2 pos, vector<Vector2> emptyPositions)
+{
+	bool valid{ true };
 
+	int value = grid[pos.x][pos.y]; //	store value incase cell position isn't valid
+
+	grid[pos.x][pos.y] = 0; 
+	
+	vector<int> solutions = filterRow(values, 2, pos.x, pos.y);
+
+	solutions = filterColumn(solutions, 2, pos.x, pos.y);
+
+	solutions = filterSquare(solutions, pos);
+
+	if (solutions.size() != 1)
+	{
+		valid = false;
+		grid[pos.x][pos.y] = value;
+	}
+
+	return valid;
+}
+
+//	creates a puzzle for the user and solver to work on
+vector<Vector2> generatePuzzle()
+{
+	//	stores all grid positions, shuffled
+	vector<Vector2> allPositions{ shufflePositions(getAllPositions()) };
+
+	vector<Vector2> emptyPositions{ };
+
+	for (int i = 0; i <= allPositions.size() - 1; i++)
+	{
+		// if position has unique solution
+		if (confirmPosition(allPositions[i], emptyPositions)) 
+		{
+			emptyPositions.push_back(allPositions[i]);
+		}
+	}
+
+	return emptyPositions;
+}
 
 int main()
 {
-	srand(time(0));
+	srand(unsigned(time(0)));
 
-	generateGrid();
+	generateGrid();	//	generates a grid to make a puzzle on
 
-	//	storing all empty cell positions in a vector-list of Vector2's
-	//vector<Vector2> emptyPositions { returnEmptyPositions() };
+	outputGrid();
 
-	//unsigned int emptyCount{ emptyPositions.size() };
+	//	while generating puzzle, stores the empty positions for Solver to use
+	vector<Vector2> emptyPositions{ };
 
+	while (emptyPositions.size() < 34) // only accept puzzles with < 46 clues
+	{
+		emptyPositions = generatePuzzle();
+	}
 
-	//solveSudoku(emptyPositions, emptyCount);
+	outputGrid();
 
-	//cout << "\n";
-	//cout << "Number of empty positions: " << emptyCount << "\n";
-	//cout << "\n";
+	//solveSudoku(emptyPositions, emptyPositions.size());
+
+	cout << "\n";
+	cout << "Number of empty positions: " << emptyPositions.size() << "\n";
 
 	//outputGrid();
 
