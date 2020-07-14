@@ -4,6 +4,6 @@ Features:\
 . Solves a given 9x9 Sudoku puzzle through a backtracking algorithm\
 . Took an iterative approach over a recursive one\
 
-Currently working on:
+Currently working on:\
 . Sudoku generator
 
